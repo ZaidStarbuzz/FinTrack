@@ -210,3 +210,4 @@ date,description,amount,type,category,notes,tags
 
 MIT License — free to use, modify, and deploy.
 # FinTrack
+# FinTrack
