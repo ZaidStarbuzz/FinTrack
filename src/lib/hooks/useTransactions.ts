@@ -119,25 +119,31 @@ function buildDateRange1(filters: TransactionFilters) {
 }
 async function fetchTransactions(filters: TransactionFilters, page = 0) {
   // Normalize filters: compute from/to from datePreset, accept singular category/account keys
-  const dateRange = buildDateRange(filters)
-  const payloadFilters: any = { ...filters }
+  const dateRange = buildDateRange(filters);
+  const payloadFilters: any = { ...filters };
   // ensure we send from/to as ISO strings for server
-  if (dateRange?.from) payloadFilters.from = dateRange.from
-  if (dateRange?.to) payloadFilters.to = dateRange.to
+  if (dateRange?.from) payloadFilters.from = dateRange.from;
+  if (dateRange?.to) payloadFilters.to = dateRange.to;
   // normalize singular keys
-  if ((filters as any).categoryId && !filters.categoryIds) payloadFilters.categoryIds = [(filters as any).categoryId]
-  if ((filters as any).accountId && !filters.accountIds) payloadFilters.accountIds = [(filters as any).accountId]
+  if ((filters as any).categoryId && !filters.categoryIds)
+    payloadFilters.categoryIds = [(filters as any).categoryId];
+  if ((filters as any).accountId && !filters.accountIds)
+    payloadFilters.accountIds = [(filters as any).accountId];
 
   // Use server-side query to avoid RLS issues when using custom JWTs
-  const res = await fetch('/api/transactions/query', {
-    method: 'POST',
-    credentials: 'include',
-    headers: { 'content-type': 'application/json' },
+  const res = await fetch("/api/transactions/query", {
+    method: "POST",
+    credentials: "include",
+    headers: { "content-type": "application/json" },
     body: JSON.stringify({ filters: payloadFilters, page }),
-  })
-  const payload = await res.json()
-  if (!res.ok) throw new Error(payload?.error || 'Failed to fetch transactions')
-  return { data: payload.data as Transaction[], count: payload.count as number }
+  });
+  const payload = await res.json();
+  if (!res.ok)
+    throw new Error(payload?.error || "Failed to fetch transactions");
+  return {
+    data: payload.data as Transaction[],
+    count: payload.count as number,
+  };
 }
 
 async function fetchTransactionsa(filters: TransactionFilters, page = 0) {
@@ -191,17 +197,24 @@ export function useTransactionStats(filters: TransactionFilters) {
   return useQuery({
     queryKey: ["transaction-stats", filters],
     queryFn: async () => {
-      const dateRange = buildDateRange(filters)
-      const payloadFilters: any = { ...filters }
-      if (dateRange?.from) payloadFilters.from = dateRange.from
-      if (dateRange?.to) payloadFilters.to = dateRange.to
-      if ((filters as any).categoryId && !filters.categoryIds) payloadFilters.categoryIds = [(filters as any).categoryId]
-      if ((filters as any).accountId && !filters.accountIds) payloadFilters.accountIds = [(filters as any).accountId]
+      const dateRange = buildDateRange(filters);
+      const payloadFilters: any = { ...filters };
+      if (dateRange?.from) payloadFilters.from = dateRange.from;
+      if (dateRange?.to) payloadFilters.to = dateRange.to;
+      if ((filters as any).categoryId && !filters.categoryIds)
+        payloadFilters.categoryIds = [(filters as any).categoryId];
+      if ((filters as any).accountId && !filters.accountIds)
+        payloadFilters.accountIds = [(filters as any).accountId];
 
-      const res = await fetch('/api/transactions/stats', { method: 'POST', credentials: 'include', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ filters: payloadFilters }) })
-      const payload = await res.json()
-      if (!res.ok) throw new Error(payload?.error || 'Failed to compute stats')
-      return payload
+      const res = await fetch("/api/transactions/stats", {
+        method: "POST",
+        credentials: "include",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ filters: payloadFilters }),
+      });
+      const payload = await res.json();
+      if (!res.ok) throw new Error(payload?.error || "Failed to compute stats");
+      return payload;
     },
   });
 }
@@ -210,10 +223,16 @@ export function useCreateTransaction() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (input: TransactionInput) => {
-      const res = await fetch('/api/transactions', { method: 'POST', credentials: 'include', headers: { 'content-type': 'application/json' }, body: JSON.stringify(input) })
-      const payload = await res.json()
-      if (!res.ok) throw new Error(payload?.error || 'Failed to create transaction')
-      return payload.transaction
+      const res = await fetch("/api/transactions", {
+        method: "POST",
+        credentials: "include",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(input),
+      });
+      const payload = await res.json();
+      if (!res.ok)
+        throw new Error(payload?.error || "Failed to create transaction");
+      return payload.transaction;
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["transactions"] });
@@ -233,10 +252,16 @@ export function useUpdateTransaction() {
       id,
       ...input
     }: Partial<TransactionInput> & { id: string }) => {
-      const res = await fetch('/api/transactions', { method: 'PATCH', credentials: 'include', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ id, ...input }) })
-      const payload = await res.json()
-      if (!res.ok) throw new Error(payload?.error || 'Failed to update transaction')
-      return payload.transaction
+      const res = await fetch("/api/transactions", {
+        method: "PATCH",
+        credentials: "include",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ id, ...input }),
+      });
+      const payload = await res.json();
+      if (!res.ok)
+        throw new Error(payload?.error || "Failed to update transaction");
+      return payload.transaction;
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["transactions"] });
@@ -252,9 +277,15 @@ export function useDeleteTransaction() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (id: string) => {
-      const res = await fetch('/api/transactions', { method: 'DELETE', credentials: 'include', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ id }) })
-      const payload = await res.json()
-      if (!res.ok) throw new Error(payload?.error || 'Failed to delete transaction')
+      const res = await fetch("/api/transactions", {
+        method: "DELETE",
+        credentials: "include",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ id }),
+      });
+      const payload = await res.json();
+      if (!res.ok)
+        throw new Error(payload?.error || "Failed to delete transaction");
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["transactions"] });
