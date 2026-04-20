@@ -6,6 +6,7 @@ import {
   useInfiniteQuery,
 } from "@tanstack/react-query";
 import { createClient } from "../supabase/client";
+import { getCurrentUser } from "@/lib/session";
 import { Transaction, TransactionFilters } from "../types";
 import { TransactionInput } from "../validations/transaction";
 import {
@@ -117,141 +118,26 @@ function buildDateRange1(filters: TransactionFilters) {
   }
 }
 async function fetchTransactions(filters: TransactionFilters, page = 0) {
-  const PAGE_SIZE = 25;
+  // Normalize filters: compute from/to from datePreset, accept singular category/account keys
+  const dateRange = buildDateRange(filters)
+  const payloadFilters: any = { ...filters }
+  // ensure we send from/to as ISO strings for server
+  if (dateRange?.from) payloadFilters.from = dateRange.from
+  if (dateRange?.to) payloadFilters.to = dateRange.to
+  // normalize singular keys
+  if ((filters as any).categoryId && !filters.categoryIds) payloadFilters.categoryIds = [(filters as any).categoryId]
+  if ((filters as any).accountId && !filters.accountIds) payloadFilters.accountIds = [(filters as any).accountId]
 
-  // 🔧 helper to avoid timezone shifting issues
-  const toUTCISOString = (date: Date) =>
-    new Date(date.getTime() - date.getTimezoneOffset() * 60000).toISOString();
-
-  function buildSafeDateRange() {
-    const now = new Date();
-
-    switch (filters.datePreset) {
-      case "today":
-        return {
-          from: toUTCISOString(startOfDay(now)),
-          to: toUTCISOString(endOfDay(now)),
-        };
-
-      case "this_week":
-        return {
-          from: toUTCISOString(startOfWeek(now)),
-          to: toUTCISOString(endOfWeek(now)),
-        };
-
-      case "this_month":
-        return {
-          from: toUTCISOString(startOfMonth(now)),
-          to: toUTCISOString(endOfMonth(now)),
-        };
-
-      case "last_7_days":
-        return {
-          from: toUTCISOString(subDays(now, 7)),
-          to: toUTCISOString(now),
-        };
-
-      case "last_30_days":
-        return {
-          from: toUTCISOString(subDays(now, 30)),
-          to: toUTCISOString(now),
-        };
-
-      case "this_year":
-        return {
-          from: toUTCISOString(startOfYear(now)),
-          to: toUTCISOString(endOfYear(now)),
-        };
-
-      case "custom":
-        return {
-          from: filters.dateFrom,
-          to: filters.dateTo,
-        };
-
-      default:
-        return {
-          from: toUTCISOString(startOfMonth(now)),
-          to: toUTCISOString(endOfMonth(now)),
-        };
-    }
-  }
-
-  const { from, to } = buildSafeDateRange();
-
-  console.log("FILTERS:", filters);
-  console.log("DATE RANGE:", { from, to });
-
-  let query = supabase
-    .from("transactions")
-    .select(
-      `
-  *,
-  account:accounts!transactions_account_id_fkey(*),
-  transfer_account:accounts!transactions_transfer_account_id_fkey(*),
-  category:categories(*)
-`,
-    )
-    .order("date", { ascending: false })
-    .range(page * PAGE_SIZE, (page + 1) * PAGE_SIZE - 1);
-
-  // ✅ Date filter (fixed)
-  if (from && to) {
-    query = query.gte("date", from).lte("date", to);
-  }
-
-  // ✅ Type filter
-  if (filters.types?.length) {
-    query = query.in("type", filters.types);
-  }
-
-  // ✅ Category filter
-  if (filters.categoryIds?.length) {
-    query = query.in("category_id", filters.categoryIds);
-  }
-
-  // ✅ Account filter
-  if (filters.accountIds?.length) {
-    query = query.in("account_id", filters.accountIds);
-  }
-
-  // ✅ Amount filters (handle string/numeric safely)
-  if (filters.amountMin != null) {
-    query = query.gte("amount", filters.amountMin);
-  }
-
-  if (filters.amountMax != null) {
-    query = query.lte("amount", filters.amountMax);
-  }
-
-  // ✅ Status filter
-  if (filters.status?.length) {
-    query = query.in("status", filters.status);
-  }
-
-  // ✅ FIXED search (no more textSearch bug)
-  if (filters.search?.trim()) {
-    query = query.ilike("description", `%${filters.search.trim()}%`);
-  }
-
-  // ✅ Tags filter (only if column is array)
-  if (Array.isArray(filters.tags) && filters.tags.length > 0) {
-    query = query.overlaps("tags", filters.tags);
-  }
-
-  const { data, error, count } = await query;
-
-  console.log("QUERY RESULT:", { data, error, count });
-
-  if (error) {
-    console.error("SUPABASE ERROR:", error);
-    throw error;
-  }
-
-  return {
-    data: (data ?? []) as Transaction[],
-    count: count ?? 0,
-  };
+  // Use server-side query to avoid RLS issues when using custom JWTs
+  const res = await fetch('/api/transactions/query', {
+    method: 'POST',
+    credentials: 'include',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ filters: payloadFilters, page }),
+  })
+  const payload = await res.json()
+  if (!res.ok) throw new Error(payload?.error || 'Failed to fetch transactions')
+  return { data: payload.data as Transaction[], count: payload.count as number }
 }
 
 async function fetchTransactionsa(filters: TransactionFilters, page = 0) {
@@ -305,75 +191,17 @@ export function useTransactionStats(filters: TransactionFilters) {
   return useQuery({
     queryKey: ["transaction-stats", filters],
     queryFn: async () => {
-      const { from, to } = buildDateRange(filters);
-      let query = supabase
-        .from("transactions")
-        .select("type, amount, category_id, categories(name,icon,color)")
-        .neq("status", "void");
+      const dateRange = buildDateRange(filters)
+      const payloadFilters: any = { ...filters }
+      if (dateRange?.from) payloadFilters.from = dateRange.from
+      if (dateRange?.to) payloadFilters.to = dateRange.to
+      if ((filters as any).categoryId && !filters.categoryIds) payloadFilters.categoryIds = [(filters as any).categoryId]
+      if ((filters as any).accountId && !filters.accountIds) payloadFilters.accountIds = [(filters as any).accountId]
 
-      if (from) query = query.gte("date", from);
-      if (to) query = query.lte("date", to);
-
-      const { data, error } = await query;
-      if (error) throw error;
-
-      const income = (data || [])
-        .filter((t) => t.type === "income")
-        .reduce((s, t) => s + t.amount, 0);
-      const expenses = (data || [])
-        .filter((t) => t.type === "expense")
-        .reduce((s, t) => s + t.amount, 0);
-      const net = income - expenses;
-      const savingsRate = income > 0 ? (net / income) * 100 : 0;
-
-      // Category breakdown
-      const catMap = new Map<
-        string,
-        {
-          name: string;
-          icon: string;
-          color: string;
-          amount: number;
-          count: number;
-        }
-      >();
-      (data || [])
-        .filter((t) => t.type === "expense")
-        .forEach((t) => {
-          const key = t.category_id || "uncategorized";
-          const cat = (t as any).categories;
-          const existing = catMap.get(key) || {
-            name: cat?.name || "Uncategorized",
-            icon: cat?.icon || "package",
-            color: cat?.color || "#888",
-            amount: 0,
-            count: 0,
-          };
-          existing.amount += t.amount;
-          existing.count += 1;
-          catMap.set(key, existing);
-        });
-
-      const categorySpending = Array.from(catMap.entries())
-        .map(([id, v]) => ({
-          category_id: id,
-          category_name: v.name,
-          icon: v.icon,
-          color: v.color,
-          total_amount: v.amount,
-          transaction_count: v.count,
-          percentage: expenses > 0 ? (v.amount / expenses) * 100 : 0,
-        }))
-        .sort((a, b) => b.total_amount - a.total_amount);
-
-      return {
-        income,
-        expenses,
-        net,
-        savingsRate,
-        categorySpending,
-        transactionCount: (data || []).length,
-      };
+      const res = await fetch('/api/transactions/stats', { method: 'POST', credentials: 'include', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ filters: payloadFilters }) })
+      const payload = await res.json()
+      if (!res.ok) throw new Error(payload?.error || 'Failed to compute stats')
+      return payload
     },
   });
 }
@@ -382,17 +210,10 @@ export function useCreateTransaction() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (input: TransactionInput) => {
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
-      if (!user) throw new Error("Not authenticated");
-      const { data, error } = await supabase
-        .from("transactions")
-        .insert({ ...input, user_id: user.id })
-        .select()
-        .single();
-      if (error) throw error;
-      return data;
+      const res = await fetch('/api/transactions', { method: 'POST', credentials: 'include', headers: { 'content-type': 'application/json' }, body: JSON.stringify(input) })
+      const payload = await res.json()
+      if (!res.ok) throw new Error(payload?.error || 'Failed to create transaction')
+      return payload.transaction
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["transactions"] });
@@ -412,14 +233,10 @@ export function useUpdateTransaction() {
       id,
       ...input
     }: Partial<TransactionInput> & { id: string }) => {
-      const { data, error } = await supabase
-        .from("transactions")
-        .update(input)
-        .eq("id", id)
-        .select()
-        .single();
-      if (error) throw error;
-      return data;
+      const res = await fetch('/api/transactions', { method: 'PATCH', credentials: 'include', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ id, ...input }) })
+      const payload = await res.json()
+      if (!res.ok) throw new Error(payload?.error || 'Failed to update transaction')
+      return payload.transaction
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["transactions"] });
@@ -435,11 +252,9 @@ export function useDeleteTransaction() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (id: string) => {
-      const { error } = await supabase
-        .from("transactions")
-        .delete()
-        .eq("id", id);
-      if (error) throw error;
+      const res = await fetch('/api/transactions', { method: 'DELETE', credentials: 'include', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ id }) })
+      const payload = await res.json()
+      if (!res.ok) throw new Error(payload?.error || 'Failed to delete transaction')
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["transactions"] });

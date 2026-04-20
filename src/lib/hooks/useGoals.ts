@@ -1,6 +1,7 @@
 "use client";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { createClient } from "../supabase/client";
+import { getCurrentUser } from "@/lib/session";
 import { Goal } from "../types";
 import { GoalInput } from "../validations/transaction";
 import { toast } from "sonner";
@@ -34,9 +35,7 @@ export function useCreateGoal() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (input: GoalInput) => {
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
+      const user = await getCurrentUser();
       if (!user) throw new Error("Not authenticated");
       const { data, error } = await supabase
         .from("goals")

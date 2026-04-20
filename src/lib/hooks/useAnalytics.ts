@@ -1,10 +1,7 @@
 'use client'
 import { useQuery } from '@tanstack/react-query'
-import { createClient } from '../supabase/client'
 import { startOfMonth, endOfMonth, subMonths, format, eachDayOfInterval, startOfDay, endOfDay } from 'date-fns'
 import { generateSmartInsights, calculateBurnRate, calculateRunway } from '../utils/financial'
-
-const supabase = createClient()
 
 export function useMonthlyTrends(months = 12) {
   return useQuery({
@@ -12,20 +9,19 @@ export function useMonthlyTrends(months = 12) {
     queryFn: async () => {
       const now = new Date()
       const from = subMonths(startOfMonth(now), months - 1)
-      const { data, error } = await supabase
-        .from('transactions')
-        .select('type, amount, date')
-        .gte('date', from.toISOString())
-        .neq('status', 'void')
-        .neq('type', 'transfer')
-      if (error) throw error
+      // fetch transactions from server-side endpoint
+      const res = await fetch('/api/transactions/query', { method: 'POST', credentials: 'include', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ filters: { from: from.toISOString(), to: endOfMonth(now).toISOString() }, page: 0 }) })
+      const payload = await res.json()
+      if (!res.ok) throw new Error(payload?.error || 'Failed to fetch transactions')
+      const data = payload.data || []
 
       const monthMap = new Map<string, { income: number; expense: number }>()
       for (let i = 0; i < months; i++) {
         const m = subMonths(now, months - 1 - i)
         monthMap.set(format(m, 'yyyy-MM'), { income: 0, expense: 0 })
       }
-      ;(data || []).forEach(t => {
+      ;(data || []).forEach((t:any) => {
+        if (t.status === 'void' || t.type === 'transfer') return
         const key = format(new Date(t.date), 'yyyy-MM')
         const existing = monthMap.get(key)
         if (existing) {
@@ -52,17 +48,14 @@ export function useSpendingHeatmap() {
     queryFn: async () => {
       const end = new Date()
       const start = subMonths(end, 3)
-      const { data, error } = await supabase
-        .from('transactions')
-        .select('amount, date')
-        .eq('type', 'expense')
-        .gte('date', start.toISOString())
-        .lte('date', end.toISOString())
-        .neq('status', 'void')
-      if (error) throw error
+      const res = await fetch('/api/transactions/query', { method: 'POST', credentials: 'include', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ filters: { from: start.toISOString(), to: end.toISOString(), types: ['expense'] }, page: 0 }) })
+      const payload = await res.json()
+      if (!res.ok) throw new Error(payload?.error || 'Failed to fetch transactions')
+      const data = payload.data || []
 
       const map = new Map<string, number>()
-      ;(data || []).forEach(t => {
+      ;(data || []).forEach((t:any) => {
+        if (t.status === 'void') return
         const day = format(new Date(t.date), 'yyyy-MM-dd')
         map.set(day, (map.get(day) || 0) + t.amount)
       })
@@ -86,45 +79,44 @@ export function useSmartInsights() {
       const prevStart = startOfMonth(subMonths(now, 1)).toISOString()
       const prevEnd = endOfMonth(subMonths(now, 1)).toISOString()
 
-      const [currTxs, prevTxs, accounts] = await Promise.all([
-        supabase.from('transactions').select('type,amount,category_id,categories(name,icon,color)').gte('date', currStart).lte('date', currEnd).neq('status', 'void').neq('type', 'transfer'),
-        supabase.from('transactions').select('type,amount,category_id').gte('date', prevStart).lte('date', prevEnd).neq('status', 'void').neq('type', 'transfer'),
-        supabase.from('accounts').select('balance').eq('status', 'active'),
+      const [currRes, prevRes, accountsRes] = await Promise.all([
+        fetch('/api/transactions/stats', { method: 'POST', credentials: 'include', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ filters: { from: currStart, to: currEnd } }) }),
+        fetch('/api/transactions/stats', { method: 'POST', credentials: 'include', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ filters: { from: prevStart, to: prevEnd } }) }),
+        fetch('/api/accounts', { credentials: 'include' }),
       ])
+      const currPayload = await currRes.json()
+      const prevPayload = await prevRes.json()
+      const accountsPayload = await accountsRes.json()
+      if (!currRes.ok) throw new Error(currPayload?.error || 'Failed to fetch current month stats')
+      if (!prevRes.ok) throw new Error(prevPayload?.error || 'Failed to fetch previous month stats')
+      if (!accountsRes.ok) throw new Error(accountsPayload?.error || 'Failed to fetch accounts')
 
-      const curr = currTxs.data || []
-      const prev = prevTxs.data || []
-      const totalBalance = (accounts.data || []).reduce((s, a) => s + a.balance, 0)
+      const curr = currPayload || { income: 0, expenses: 0, categorySpending: [] }
+      const prev = prevPayload || { income: 0, expenses: 0 }
+      const totalBalance = (accountsPayload.accounts || []).reduce((s: number, a: any) => s + (a.balance || 0), 0)
 
-      const currIncome = curr.filter(t => t.type === 'income').reduce((s, t) => s + t.amount, 0)
-      const currExpense = curr.filter(t => t.type === 'expense').reduce((s, t) => s + t.amount, 0)
-      const prevExpense = prev.filter(t => t.type === 'expense').reduce((s, t) => s + t.amount, 0)
+  const currIncome = currPayload.income || 0
+  const currExpense = currPayload.expenses || 0
+  const prevExpense = prevPayload.expenses || 0
 
-      const catMap = new Map<string, { name: string; amount: number }>()
-      curr.filter(t => t.type === 'expense').forEach(t => {
-        const key = t.category_id || 'other'
-        const cat = (t as any).categories
-        const e = catMap.get(key) || { name: cat?.name || 'Other', amount: 0 }
-        e.amount += t.amount
-        catMap.set(key, e)
-      })
-      const topCategories = Array.from(catMap.values()).sort((a, b) => b.amount - a.amount)
+      // currPayload contains income, expenses, categorySpending
+      const topCategories = (currPayload.categorySpending || [])
 
-      const burnRate = calculateBurnRate([prevExpense, currExpense])
+      const burnRate = calculateBurnRate([prevPayload.expenses || 0, currPayload.expenses || 0])
       const runway = calculateRunway(totalBalance, burnRate)
 
-      const insights = []
-      const savingsRate = currIncome > 0 ? ((currIncome - currExpense) / currIncome) * 100 : 0
+      const insights: any[] = []
+      const savingsRate = (currPayload.income || 0) > 0 ? (((currPayload.income || 0) - (currPayload.expenses || 0)) / (currPayload.income || 0)) * 100 : 0
 
       if (savingsRate >= 20) insights.push({ id: '1', type: 'success' as const, title: 'Great Savings Rate!', message: `You're saving ${savingsRate.toFixed(1)}% of your income this month.` })
       else if (savingsRate < 10) insights.push({ id: '1', type: 'warning' as const, title: 'Low Savings Rate', message: `You're saving only ${savingsRate.toFixed(1)}%. Try to save at least 20%.` })
 
-      if (prevExpense > 0) {
-        const diff = ((currExpense - prevExpense) / prevExpense) * 100
+      if ((prevPayload.expenses || 0) > 0) {
+        const diff = (((currPayload.expenses || 0) - (prevPayload.expenses || 0)) / (prevPayload.expenses || 0)) * 100
         if (diff > 20) insights.push({ id: '2', type: 'warning' as const, title: 'Spending Spike!', message: `Expenses increased by ${diff.toFixed(1)}% compared to last month.` })
       }
 
-      if (topCategories[0]) insights.push({ id: '3', type: 'info' as const, title: `Top Spend: ${topCategories[0].name}`, message: `₹${topCategories[0].amount.toLocaleString('en-IN')} spent this month.` })
+      if (topCategories[0]) insights.push({ id: '3', type: 'info' as const, title: `Top Spend: ${topCategories[0].category_name}`, message: `₹${(topCategories[0].total_amount || 0).toLocaleString('en-IN')} spent this month.` })
 
       if (runway < 3 && runway > 0) insights.push({ id: '4', type: 'warning' as const, title: 'Low Runway!', message: `At current spending, your funds last ${runway} months.` })
       else if (runway >= 6) insights.push({ id: '4', type: 'success' as const, title: 'Healthy Runway', message: `Your funds can last ${runway}+ months at current spending.` })

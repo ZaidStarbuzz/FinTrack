@@ -1,6 +1,7 @@
 "use client";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { createClient } from "../supabase/client";
+import { getCurrentUser } from "@/lib/session";
 import { Account } from "../types";
 import { AccountInput } from "../validations/transaction";
 import { toast } from "sonner";
@@ -11,14 +12,11 @@ export function useAccounts() {
   return useQuery({
     queryKey: ["accounts"],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from("accounts")
-        .select("*")
-        .eq("status", "active")
-        .order("is_default", { ascending: false })
-        .order("name");
-      if (error) throw error;
-      return data as Account[];
+      const res = await fetch('/api/accounts', { credentials: 'include' })
+      const payload = await res.json()
+      if (!res.ok) throw new Error(payload?.error || 'Failed to fetch accounts')
+      // server returns { accounts }
+      return payload.accounts as Account[]
     },
   });
 }
@@ -27,17 +25,11 @@ export function useCreateAccount() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (input: AccountInput) => {
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
-      if (!user) throw new Error("Not authenticated");
-      const { data, error } = await supabase
-        .from("accounts")
-        .insert({ ...input, user_id: user.id })
-        .select()
-        .single();
-      if (error) throw error;
-      return data;
+      // create via server API so we don't run into RLS issues when using custom JWTs
+      const res = await fetch('/api/accounts', { method: 'POST', credentials: 'include', headers: { 'content-type': 'application/json' }, body: JSON.stringify(input) })
+      const payload = await res.json()
+      if (!res.ok) throw new Error(payload?.error || 'Failed to create account')
+      return payload.account
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["accounts"] });
@@ -54,14 +46,10 @@ export function useUpdateAccount() {
       id,
       ...input
     }: Partial<AccountInput> & { id: string }) => {
-      const { data, error } = await supabase
-        .from("accounts")
-        .update(input)
-        .eq("id", id)
-        .select()
-        .single();
-      if (error) throw error;
-      return data;
+      const res = await fetch('/api/accounts', { method: 'PATCH', credentials: 'include', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ id, ...input }) })
+      const payload = await res.json()
+      if (!res.ok) throw new Error(payload?.error || 'Failed to update account')
+      return payload.account
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["accounts"] });
@@ -75,11 +63,9 @@ export function useDeleteAccount() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (id: string) => {
-      const { error } = await supabase
-        .from("accounts")
-        .update({ status: "closed" })
-        .eq("id", id);
-      if (error) throw error;
+      const res = await fetch('/api/accounts', { method: 'DELETE', credentials: 'include', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ id }) })
+      const payload = await res.json()
+      if (!res.ok) throw new Error(payload?.error || 'Failed to delete account')
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["accounts"] });

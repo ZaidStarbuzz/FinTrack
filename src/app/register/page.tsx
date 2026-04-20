@@ -166,35 +166,28 @@ export default function RegisterPage() {
   const [success, setSuccess] = useState(false);
 
   const router = useRouter();
-  const supabase = createClient();
-
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
     setError("");
-
-    const { data, error } = await supabase.auth.signUp({
-      email,
-      password,
-      options: {
-        data: { full_name: fullName },
-        emailRedirectTo: `${window.location.origin}/dashboard`,
-      },
-    });
-
-    setLoading(false);
-
-    if (error) {
-      if (error.message.includes("User already registered")) {
-        setError("This email is already registered. Try signing in instead.");
-      } else {
-        setError(error.message);
+    try {
+      const res = await fetch("/api/auth/register", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email, password, full_name: fullName }),
+      });
+      const json = await res.json();
+      setLoading(false);
+      if (!res.ok) setError(json.error || "Registration failed");
+      else {
+        setSuccess(true);
+        setFullName("");
+        setEmail("");
+        setPassword("");
       }
-    } else {
-      setSuccess(true);
-      setFullName("");
-      setEmail("");
-      setPassword("");
+    } catch (e: any) {
+      setLoading(false);
+      setError(e?.message || "Registration failed");
     }
   };
 

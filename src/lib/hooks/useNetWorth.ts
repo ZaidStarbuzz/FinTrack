@@ -1,6 +1,7 @@
 "use client";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { createClient } from "../supabase/client";
+import { getCurrentUser } from "@/lib/session";
 import { Asset, Account } from "../types";
 import { toast } from "sonner";
 
@@ -17,48 +18,17 @@ export function useNetWorth() {
   }>({
     queryKey: ["net-worth"],
     queryFn: async () => {
-      const [assetsRes, accountsRes, loansRes] = await Promise.all([
-        supabase.from("assets").select("*").order("type"),
-        // select id and name as well because UI expects them
-        supabase
-          .from("accounts")
-          .select("id,name,balance,type,is_excluded_from_net_worth")
-          .eq("status", "active"),
-        supabase
-          .from("loans")
-          .select("outstanding_balance")
-          .eq("status", "active"),
-      ]);
-
-      const assets = (assetsRes.data || []) as Asset[];
-      const accounts = (accountsRes.data || []) as Account[];
-      const loans = loansRes.data || [];
-
-      const manualAssets = assets.reduce((s, a) => s + a.current_value, 0);
-      const accountAssets = accounts
-        .filter((a) => !a.is_excluded_from_net_worth && a.balance > 0)
-        .reduce((s, a) => s + a.balance, 0);
-      const liquidAssets = accounts
-        .filter(
-          (a) => ["bank", "cash", "wallet"].includes(a.type) && a.balance > 0,
-        )
-        .reduce((s, a) => s + a.balance, 0);
-
-      const totalAssets = manualAssets + accountAssets;
-      const totalLiabilities = loans.reduce(
-        (s, l) => s + (l.outstanding_balance || 0),
-        0,
-      );
-      const netWorth = totalAssets - totalLiabilities;
-
+      const res = await fetch('/api/net-worth', { credentials: 'include' })
+      const payload = await res.json()
+      if (!res.ok) throw new Error(payload?.error || 'Failed to fetch net worth')
       return {
-        assets,
-        totalAssets,
-        totalLiabilities,
-        netWorth,
-        liquidAssets,
-        accounts,
-      };
+        assets: payload.assets || [],
+        totalAssets: payload.totalAssets || 0,
+        totalLiabilities: payload.totalLiabilities || 0,
+        netWorth: payload.netWorth || 0,
+        liquidAssets: payload.liquidAssets || 0,
+        accounts: payload.accounts || [],
+      }
     },
   });
 }
@@ -67,17 +37,10 @@ export function useCreateAsset() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (input: Partial<Asset>) => {
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
-      if (!user) throw new Error("Not authenticated");
-      const { data, error } = await supabase
-        .from("assets")
-        .insert({ ...input, user_id: user.id })
-        .select()
-        .single();
-      if (error) throw error;
-      return data;
+      const res = await fetch('/api/assets', { method: 'POST', credentials: 'include', headers: { 'content-type': 'application/json' }, body: JSON.stringify(input) })
+      const payload = await res.json()
+      if (!res.ok) throw new Error(payload?.error || 'Failed to create asset')
+      return payload.asset
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["net-worth"] });
@@ -91,14 +54,10 @@ export function useUpdateAsset() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async ({ id, ...input }: Partial<Asset> & { id: string }) => {
-      const { data, error } = await supabase
-        .from("assets")
-        .update(input)
-        .eq("id", id)
-        .select()
-        .single();
-      if (error) throw error;
-      return data;
+      const res = await fetch('/api/assets', { method: 'PATCH', credentials: 'include', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ id, ...input }) })
+      const payload = await res.json()
+      if (!res.ok) throw new Error(payload?.error || 'Failed to update asset')
+      return payload.asset
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["net-worth"] });
@@ -112,8 +71,9 @@ export function useDeleteAsset() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (id: string) => {
-      const { error } = await supabase.from("assets").delete().eq("id", id);
-      if (error) throw error;
+      const res = await fetch('/api/assets', { method: 'DELETE', credentials: 'include', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ id }) })
+      const payload = await res.json()
+      if (!res.ok) throw new Error(payload?.error || 'Failed to delete asset')
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["net-worth"] });
