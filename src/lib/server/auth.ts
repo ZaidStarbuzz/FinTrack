@@ -50,7 +50,10 @@ export async function sendEmail(to: string, subject: string, html: string) {
   });
 
   const from = `${process.env.GMAIL_FROM_NAME || "FinTrack"} <${smtpUser}>`;
-  const text = html.replace(/<[^>]+>/g, "").replace(/\s+/g, " ").trim();
+  const text = html
+    .replace(/<[^>]+>/g, "")
+    .replace(/\s+/g, " ")
+    .trim();
 
   try {
     await transporter.sendMail({

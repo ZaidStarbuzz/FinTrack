@@ -1,25 +1,29 @@
-'use client'
-import { DashboardLayout } from '@/components/shared/DashboardLayout'
-import { useTransactionStats } from '@/lib/hooks/useTransactions'
-import { useMonthlyTrends } from '@/lib/hooks/useAnalytics'
-import { useAccounts } from '@/lib/hooks/useAccounts'
-import { useExportCSV } from '@/lib/hooks/useImportExport'
-import { useAppStore } from '@/lib/stores/useAppStore'
-import { formatCurrency, formatDate } from '@/lib/utils/format'
-import { Download, FileText, FileSpreadsheet, Loader2 } from 'lucide-react'
-import { useState } from 'react'
-import { startOfMonth, endOfMonth, subMonths, format } from 'date-fns'
+"use client";
+import { DashboardLayout } from "@/components/shared/DashboardLayout";
+import { useTransactionStats } from "@/lib/hooks/useTransactions";
+import { useMonthlyTrends } from "@/lib/hooks/useAnalytics";
+import { useAccounts } from "@/lib/hooks/useAccounts";
+import { useExportCSV } from "@/lib/hooks/useImportExport";
+import { useAppStore } from "@/lib/stores/useAppStore";
+import { formatCurrency, formatDate } from "@/lib/utils/format";
+import { Download, FileText, FileSpreadsheet, Loader2 } from "lucide-react";
+import { useState } from "react";
+import { startOfMonth, endOfMonth, subMonths, format } from "date-fns";
 
 export default function ReportsPage() {
-  const { transactionFilters } = useAppStore()
-  const { data: stats } = useTransactionStats(transactionFilters)
-  const { data: trends = [] } = useMonthlyTrends(12)
-  const { data: accounts = [] } = useAccounts()
-  const exportMutation = useExportCSV()
-  const [selectedMonth, setSelectedMonth] = useState(format(new Date(), 'yyyy-MM'))
+  const { transactionFilters } = useAppStore();
+  const { data: stats } = useTransactionStats(transactionFilters);
+  const { data: trends = [] } = useMonthlyTrends(12);
+  const { data: accounts = [] } = useAccounts();
+  const exportMutation = useExportCSV();
+  const [selectedMonth, setSelectedMonth] = useState(
+    format(new Date(), "yyyy-MM"),
+  );
 
-  const monthStart = startOfMonth(new Date(selectedMonth + '-01')).toISOString()
-  const monthEnd = endOfMonth(new Date(selectedMonth + '-01')).toISOString()
+  const monthStart = startOfMonth(
+    new Date(selectedMonth + "-01"),
+  ).toISOString();
+  const monthEnd = endOfMonth(new Date(selectedMonth + "-01")).toISOString();
 
   const exportPDF = () => {
     // Build a simple HTML report for printing
@@ -39,46 +43,56 @@ export default function ReportsPage() {
       </head>
       <body>
         <h1>FinTrack Pro — Financial Report</h1>
-        <p>Period: ${format(new Date(selectedMonth + '-01'), 'MMMM yyyy')}</p>
+        <p>Period: ${format(new Date(selectedMonth + "-01"), "MMMM yyyy")}</p>
         <h2>Summary</h2>
         <div>
-          <div class="stat"><p>Income</p><p class="income"><strong>₹${(stats?.income || 0).toLocaleString('en-IN')}</strong></p></div>
-          <div class="stat"><p>Expenses</p><p class="expense"><strong>₹${(stats?.expenses || 0).toLocaleString('en-IN')}</strong></p></div>
-          <div class="stat"><p>Savings</p><p><strong>₹${((stats?.income || 0) - (stats?.expenses || 0)).toLocaleString('en-IN')}</strong></p></div>
+          <div class="stat"><p>Income</p><p class="income"><strong>₹${(stats?.income || 0).toLocaleString("en-IN")}</strong></p></div>
+          <div class="stat"><p>Expenses</p><p class="expense"><strong>₹${(stats?.expenses || 0).toLocaleString("en-IN")}</strong></p></div>
+          <div class="stat"><p>Savings</p><p><strong>₹${((stats?.income || 0) - (stats?.expenses || 0)).toLocaleString("en-IN")}</strong></p></div>
           <div class="stat"><p>Savings Rate</p><p><strong>${(stats?.savingsRate || 0).toFixed(1)}%</strong></p></div>
         </div>
         <h2>Top Categories</h2>
         <table>
           <tr><th>Category</th><th>Amount</th><th>% of Expenses</th></tr>
-          ${(stats?.categorySpending || []).slice(0, 10).map((c: any) =>
-            `<tr><td>${c.category_name}</td><td>₹${c.total_amount.toLocaleString('en-IN')}</td><td>${c.percentage?.toFixed(1)}%</td></tr>`
-          ).join('')}
+          ${(stats?.categorySpending || [])
+            .slice(0, 10)
+            .map(
+              (c: any) =>
+                `<tr><td>${c.category_name}</td><td>₹${c.total_amount.toLocaleString("en-IN")}</td><td>${c.percentage?.toFixed(1)}%</td></tr>`,
+            )
+            .join("")}
         </table>
         <h2>Monthly Trend (Last 12 Months)</h2>
         <table>
           <tr><th>Month</th><th>Income</th><th>Expenses</th><th>Savings</th></tr>
-          ${trends.map((t: any) =>
-            `<tr><td>${t.label}</td><td class="income">₹${t.income.toLocaleString('en-IN')}</td><td class="expense">₹${t.expense.toLocaleString('en-IN')}</td><td>₹${t.savings.toLocaleString('en-IN')}</td></tr>`
-          ).join('')}
+          ${trends
+            .map(
+              (t: any) =>
+                `<tr><td>${t.label}</td><td class="income">₹${t.income.toLocaleString("en-IN")}</td><td class="expense">₹${t.expense.toLocaleString("en-IN")}</td><td>₹${t.savings.toLocaleString("en-IN")}</td></tr>`,
+            )
+            .join("")}
         </table>
         <h2>Account Balances</h2>
         <table>
           <tr><th>Account</th><th>Type</th><th>Balance</th></tr>
-          ${accounts.map((a: any) =>
-            `<tr><td>${a.name}</td><td>${a.type}</td><td>₹${a.balance.toLocaleString('en-IN')}</td></tr>`
-          ).join('')}
+          ${accounts
+            .map(
+              (a: any) =>
+                `<tr><td>${a.name}</td><td>${a.type}</td><td>₹${a.balance.toLocaleString("en-IN")}</td></tr>`,
+            )
+            .join("")}
         </table>
-        <p style="color:#888;font-size:12px;margin-top:30px">Generated by FinTrack Pro on ${format(new Date(), 'dd MMM yyyy')}</p>
+        <p style="color:#888;font-size:12px;margin-top:30px">Generated by FinTrack Pro on ${format(new Date(), "dd MMM yyyy")}</p>
       </body>
       </html>
-    `
-    const win = window.open('', '_blank')
+    `;
+    const win = window.open("", "_blank");
     if (win) {
-      win.document.write(reportContent)
-      win.document.close()
-      win.print()
+      win.document.write(reportContent);
+      win.document.close();
+      win.print();
     }
-  }
+  };
 
   return (
     <DashboardLayout title="Reports">
@@ -90,18 +104,20 @@ export default function ReportsPage() {
             <input
               type="month"
               value={selectedMonth}
-              onChange={e => setSelectedMonth(e.target.value)}
+              onChange={(e) => setSelectedMonth(e.target.value)}
               className="px-3 py-2 rounded-lg border bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary"
             />
           </div>
           <div className="flex gap-2">
             <button
-              onClick={() => exportMutation.mutate({ from: monthStart, to: monthEnd })}
+              onClick={() =>
+                exportMutation.mutate({ from: monthStart, to: monthEnd })
+              }
               disabled={exportMutation.isPending}
               className="flex items-center gap-2 px-4 py-2 rounded-lg border hover:bg-muted transition-colors text-sm"
             >
               <FileSpreadsheet className="w-4 h-4" />
-              {exportMutation.isPending ? 'Exporting...' : 'Export CSV'}
+              {exportMutation.isPending ? "Exporting..." : "Export CSV"}
             </button>
             <button
               onClick={exportPDF}
@@ -116,15 +132,34 @@ export default function ReportsPage() {
         {/* Report preview */}
         <div className="grid md:grid-cols-4 gap-4">
           {[
-            { label: 'Income', value: stats?.income || 0, color: 'text-green-500' },
-            { label: 'Expenses', value: stats?.expenses || 0, color: 'text-red-500' },
-            { label: 'Net Savings', value: (stats?.income || 0) - (stats?.expenses || 0), color: 'text-primary' },
-            { label: 'Savings Rate', value: stats?.savingsRate || 0, color: 'text-blue-500', isPercent: true },
-          ].map(item => (
+            {
+              label: "Income",
+              value: stats?.income || 0,
+              color: "text-green-500",
+            },
+            {
+              label: "Expenses",
+              value: stats?.expenses || 0,
+              color: "text-red-500",
+            },
+            {
+              label: "Net Savings",
+              value: (stats?.income || 0) - (stats?.expenses || 0),
+              color: "text-primary",
+            },
+            {
+              label: "Savings Rate",
+              value: stats?.savingsRate || 0,
+              color: "text-blue-500",
+              isPercent: true,
+            },
+          ].map((item) => (
             <div key={item.label} className="stat-card">
               <p className="text-sm text-muted-foreground">{item.label}</p>
               <p className={`text-2xl font-bold mt-1 ${item.color}`}>
-                {item.isPercent ? `${item.value.toFixed(1)}%` : formatCurrency(item.value)}
+                {item.isPercent
+                  ? `${item.value.toFixed(1)}%`
+                  : formatCurrency(item.value)}
               </p>
             </div>
           ))}
@@ -137,30 +172,61 @@ export default function ReportsPage() {
           </div>
           <div className="overflow-x-auto">
             <table className="w-full">
-              <thead><tr className="border-b bg-muted/50">
-                <th className="text-left p-3 text-sm font-medium text-muted-foreground">Category</th>
-                <th className="text-right p-3 text-sm font-medium text-muted-foreground">Amount</th>
-                <th className="text-right p-3 text-sm font-medium text-muted-foreground">Transactions</th>
-                <th className="text-right p-3 text-sm font-medium text-muted-foreground">% of Total</th>
-              </tr></thead>
+              <thead>
+                <tr className="border-b bg-muted/50">
+                  <th className="text-left p-3 text-sm font-medium text-muted-foreground">
+                    Category
+                  </th>
+                  <th className="text-right p-3 text-sm font-medium text-muted-foreground">
+                    Amount
+                  </th>
+                  <th className="text-right p-3 text-sm font-medium text-muted-foreground">
+                    Transactions
+                  </th>
+                  <th className="text-right p-3 text-sm font-medium text-muted-foreground">
+                    % of Total
+                  </th>
+                </tr>
+              </thead>
               <tbody>
                 {(stats?.categorySpending || []).map((cat: any) => (
-                  <tr key={cat.category_id} className="border-b last:border-0 hover:bg-muted/30 transition-colors">
-                    <td className="p-3 text-sm font-medium">{cat.category_name}</td>
-                    <td className="p-3 text-sm text-right font-mono">{formatCurrency(cat.total_amount)}</td>
-                    <td className="p-3 text-sm text-right text-muted-foreground">{cat.transaction_count}</td>
+                  <tr
+                    key={cat.category_id}
+                    className="border-b last:border-0 hover:bg-muted/30 transition-colors"
+                  >
+                    <td className="p-3 text-sm font-medium">
+                      {cat.category_name}
+                    </td>
+                    <td className="p-3 text-sm text-right font-mono">
+                      {formatCurrency(cat.total_amount)}
+                    </td>
+                    <td className="p-3 text-sm text-right text-muted-foreground">
+                      {cat.transaction_count}
+                    </td>
                     <td className="p-3 text-sm text-right">
                       <div className="flex items-center justify-end gap-2">
                         <div className="w-20 h-1.5 bg-muted rounded-full">
-                          <div className="h-full bg-primary rounded-full" style={{ width: `${cat.percentage}%` }} />
+                          <div
+                            className="h-full bg-primary rounded-full"
+                            style={{ width: `${cat.percentage}%` }}
+                          />
                         </div>
-                        <span className="text-muted-foreground w-10">{cat.percentage?.toFixed(1)}%</span>
+                        <span className="text-muted-foreground w-10">
+                          {cat.percentage?.toFixed(1)}%
+                        </span>
                       </div>
                     </td>
                   </tr>
                 ))}
                 {!stats?.categorySpending?.length && (
-                  <tr><td colSpan={4} className="p-8 text-center text-muted-foreground">No data for this period</td></tr>
+                  <tr>
+                    <td
+                      colSpan={4}
+                      className="p-8 text-center text-muted-foreground"
+                    >
+                      No data for this period
+                    </td>
+                  </tr>
                 )}
               </tbody>
             </table>
@@ -169,24 +235,51 @@ export default function ReportsPage() {
 
         {/* Monthly trend table */}
         <div className="rounded-xl border bg-card overflow-hidden">
-          <div className="p-4 border-b"><h3 className="font-semibold">Monthly Trend — Last 12 Months</h3></div>
+          <div className="p-4 border-b">
+            <h3 className="font-semibold">Monthly Trend — Last 12 Months</h3>
+          </div>
           <div className="overflow-x-auto">
             <table className="w-full">
-              <thead><tr className="border-b bg-muted/50">
-                <th className="text-left p-3 text-sm font-medium text-muted-foreground">Month</th>
-                <th className="text-right p-3 text-sm font-medium text-muted-foreground">Income</th>
-                <th className="text-right p-3 text-sm font-medium text-muted-foreground">Expenses</th>
-                <th className="text-right p-3 text-sm font-medium text-muted-foreground">Savings</th>
-                <th className="text-right p-3 text-sm font-medium text-muted-foreground">Rate</th>
-              </tr></thead>
+              <thead>
+                <tr className="border-b bg-muted/50">
+                  <th className="text-left p-3 text-sm font-medium text-muted-foreground">
+                    Month
+                  </th>
+                  <th className="text-right p-3 text-sm font-medium text-muted-foreground">
+                    Income
+                  </th>
+                  <th className="text-right p-3 text-sm font-medium text-muted-foreground">
+                    Expenses
+                  </th>
+                  <th className="text-right p-3 text-sm font-medium text-muted-foreground">
+                    Savings
+                  </th>
+                  <th className="text-right p-3 text-sm font-medium text-muted-foreground">
+                    Rate
+                  </th>
+                </tr>
+              </thead>
               <tbody>
                 {trends.map((t: any) => (
-                  <tr key={t.month} className="border-b last:border-0 hover:bg-muted/30 transition-colors">
+                  <tr
+                    key={t.month}
+                    className="border-b last:border-0 hover:bg-muted/30 transition-colors"
+                  >
                     <td className="p-3 text-sm font-medium">{t.label}</td>
-                    <td className="p-3 text-sm text-right text-green-500 font-mono">{formatCurrency(t.income)}</td>
-                    <td className="p-3 text-sm text-right text-red-500 font-mono">{formatCurrency(t.expense)}</td>
-                    <td className={`p-3 text-sm text-right font-mono ${t.savings >= 0 ? 'text-primary' : 'text-red-500'}`}>{formatCurrency(t.savings)}</td>
-                    <td className="p-3 text-sm text-right text-muted-foreground">{t.savings_rate.toFixed(1)}%</td>
+                    <td className="p-3 text-sm text-right text-green-500 font-mono">
+                      {formatCurrency(t.income)}
+                    </td>
+                    <td className="p-3 text-sm text-right text-red-500 font-mono">
+                      {formatCurrency(t.expense)}
+                    </td>
+                    <td
+                      className={`p-3 text-sm text-right font-mono ${t.savings >= 0 ? "text-primary" : "text-red-500"}`}
+                    >
+                      {formatCurrency(t.savings)}
+                    </td>
+                    <td className="p-3 text-sm text-right text-muted-foreground">
+                      {t.savings_rate.toFixed(1)}%
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -195,5 +288,5 @@ export default function ReportsPage() {
         </div>
       </div>
     </DashboardLayout>
-  )
+  );
 }
