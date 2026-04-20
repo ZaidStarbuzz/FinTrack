@@ -10,6 +10,15 @@ node_modules/
 /.next/
 /out/
 
+
+# local env files
+.env*.local
+.env
+/.env
+node_modules
+/.env.*
+.env.*
+
 # Production
 /build
 
