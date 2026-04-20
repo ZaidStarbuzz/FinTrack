@@ -151,8 +151,8 @@ export default function DashboardPage() {
                   {topExpenseCategories.length > 0 ? (
                     <ResponsiveContainer width="100%" height={160}>
                       <PieChart>
-                        <Pie data={topExpenseCategories} dataKey="total_amount" nameKey="category_name" cx="50%" cy="50%" outerRadius={65} innerRadius={35}>
-                          {topExpenseCategories.map((_, i) => <Cell key={i} fill={COLORS[i % COLORS.length]} />)}
+              <Pie data={topExpenseCategories} dataKey="total_amount" nameKey="category_name" cx="50%" cy="50%" outerRadius={65} innerRadius={35}>
+                {topExpenseCategories.map((_: any, i: number) => <Cell key={i} fill={COLORS[i % COLORS.length]} />)}
                         </Pie>
                         <Tooltip formatter={(v: number) => formatCurrency(v)} />
                       </PieChart>

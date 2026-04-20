@@ -38,13 +38,13 @@ export default function AnalyticsPage() {
                 <ResponsiveContainer width="100%" height={220}>
                   <PieChart>
                     <Pie data={stats?.categorySpending || []} dataKey="total_amount" nameKey="category_name" cx="50%" cy="50%" outerRadius={90} innerRadius={50}>
-                      {(stats?.categorySpending || []).map((_, i) => <Cell key={i} fill={COLORS[i % COLORS.length]} />)}
+                      {(stats?.categorySpending || []).map((_: any, i: number) => <Cell key={i} fill={COLORS[i % COLORS.length]} />)}
                     </Pie>
                     <Tooltip formatter={(v: number) => formatCurrency(v)} />
                   </PieChart>
                 </ResponsiveContainer>
                 <div className="mt-4 space-y-2">
-                  {(stats?.categorySpending || []).slice(0, 6).map((cat, i) => (
+                  {(stats?.categorySpending || []).slice(0, 6).map((cat: any, i: number) => (
                     <div key={cat.category_id} className="flex items-center gap-2">
                       <div className="w-3 h-3 rounded-full flex-shrink-0" style={{ backgroundColor: COLORS[i % COLORS.length] }} />
                       <span className="text-sm flex-1 truncate">{cat.category_name}</span>
@@ -81,7 +81,7 @@ export default function AnalyticsPage() {
             <div className="rounded-xl border bg-card p-5">
               <h3 className="font-semibold mb-3">Top Categories</h3>
               <div className="space-y-2">
-                {(stats?.categorySpending || []).slice(0, 4).map((cat, i) => (
+                {(stats?.categorySpending || []).slice(0, 4).map((cat: any, i: number) => (
                   <div key={cat.category_id} className="space-y-1">
                     <div className="flex justify-between text-sm">
                       <span>{cat.category_name}</span>

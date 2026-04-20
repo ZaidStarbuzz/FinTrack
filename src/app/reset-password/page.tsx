@@ -1,6 +1,6 @@
 "use client";
 import { useState, useEffect } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useRouter } from "next/navigation";
 import { Lock, Loader2 } from "lucide-react";
 
 export default function ResetPasswordPage() {
@@ -8,8 +8,13 @@ export default function ResetPasswordPage() {
   const [loading, setLoading] = useState(false);
   const [done, setDone] = useState(false);
   const router = useRouter();
-  const params = useSearchParams();
-  const token = params?.get("token") || "";
+  const [token, setToken] = useState('')
+
+  useEffect(() => {
+    // Read the token from the browser URL to avoid Next prerender hooks warning
+    const p = new URLSearchParams(window.location.search)
+    setToken(p.get('token') || '')
+  }, [])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();

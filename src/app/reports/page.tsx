@@ -50,21 +50,21 @@ export default function ReportsPage() {
         <h2>Top Categories</h2>
         <table>
           <tr><th>Category</th><th>Amount</th><th>% of Expenses</th></tr>
-          ${(stats?.categorySpending || []).slice(0, 10).map(c =>
+          ${(stats?.categorySpending || []).slice(0, 10).map((c: any) =>
             `<tr><td>${c.category_name}</td><td>₹${c.total_amount.toLocaleString('en-IN')}</td><td>${c.percentage?.toFixed(1)}%</td></tr>`
           ).join('')}
         </table>
         <h2>Monthly Trend (Last 12 Months)</h2>
         <table>
           <tr><th>Month</th><th>Income</th><th>Expenses</th><th>Savings</th></tr>
-          ${trends.map(t =>
+          ${trends.map((t: any) =>
             `<tr><td>${t.label}</td><td class="income">₹${t.income.toLocaleString('en-IN')}</td><td class="expense">₹${t.expense.toLocaleString('en-IN')}</td><td>₹${t.savings.toLocaleString('en-IN')}</td></tr>`
           ).join('')}
         </table>
         <h2>Account Balances</h2>
         <table>
           <tr><th>Account</th><th>Type</th><th>Balance</th></tr>
-          ${accounts.map(a =>
+          ${accounts.map((a: any) =>
             `<tr><td>${a.name}</td><td>${a.type}</td><td>₹${a.balance.toLocaleString('en-IN')}</td></tr>`
           ).join('')}
         </table>
@@ -144,7 +144,7 @@ export default function ReportsPage() {
                 <th className="text-right p-3 text-sm font-medium text-muted-foreground">% of Total</th>
               </tr></thead>
               <tbody>
-                {(stats?.categorySpending || []).map(cat => (
+                {(stats?.categorySpending || []).map((cat: any) => (
                   <tr key={cat.category_id} className="border-b last:border-0 hover:bg-muted/30 transition-colors">
                     <td className="p-3 text-sm font-medium">{cat.category_name}</td>
                     <td className="p-3 text-sm text-right font-mono">{formatCurrency(cat.total_amount)}</td>
@@ -180,7 +180,7 @@ export default function ReportsPage() {
                 <th className="text-right p-3 text-sm font-medium text-muted-foreground">Rate</th>
               </tr></thead>
               <tbody>
-                {trends.map(t => (
+                {trends.map((t: any) => (
                   <tr key={t.month} className="border-b last:border-0 hover:bg-muted/30 transition-colors">
                     <td className="p-3 text-sm font-medium">{t.label}</td>
                     <td className="p-3 text-sm text-right text-green-500 font-mono">{formatCurrency(t.income)}</td>

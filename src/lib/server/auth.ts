@@ -31,24 +31,37 @@ export function verifyToken(token: string) {
 }
 
 export async function sendEmail(to: string, subject: string, html: string) {
-  const user = process.env.GMAIL_USER;
-  const pass = process.env.GMAIL_PASS;
-  if (!user || !pass) {
-    console.warn("GMAIL_USER/GMAIL_PASS not set — skipping email send");
+  // Support generic SMTP via env vars for production (SendGrid/Postmark/etc.)
+  const smtpHost = process.env.SMTP_HOST || "smtp.gmail.com";
+  const smtpPort = process.env.SMTP_PORT ? Number(process.env.SMTP_PORT) : 465;
+  const smtpUser = process.env.SMTP_USER || process.env.GMAIL_USER;
+  const smtpPass = process.env.SMTP_PASS || process.env.GMAIL_PASS;
+
+  if (!smtpUser || !smtpPass) {
+    console.warn("SMTP_USER/SMTP_PASS not set — skipping email send");
     return;
   }
 
   const transporter = nodemailer.createTransport({
-    host: "smtp.gmail.com",
-    port: 465,
-    secure: true,
-    auth: { user, pass },
+    host: smtpHost,
+    port: smtpPort,
+    secure: smtpPort === 465, // true for 465, false for other ports
+    auth: { user: smtpUser, pass: smtpPass },
   });
 
-  await transporter.sendMail({
-    from: `${process.env.GMAIL_FROM_NAME || "FinTrack"} <${user}>`,
-    to,
-    subject,
-    html,
-  });
+  const from = `${process.env.GMAIL_FROM_NAME || "FinTrack"} <${smtpUser}>`;
+  const text = html.replace(/<[^>]+>/g, "").replace(/\s+/g, " ").trim();
+
+  try {
+    await transporter.sendMail({
+      from,
+      to,
+      subject,
+      text: text || subject,
+      html,
+    });
+  } catch (err) {
+    console.error("sendEmail error:", err);
+    throw err;
+  }
 }

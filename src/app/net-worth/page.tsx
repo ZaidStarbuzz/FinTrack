@@ -150,7 +150,7 @@ export default function NetWorthPage() {
                           outerRadius={85}
                           innerRadius={45}
                         >
-                          {pieData.map((_, i) => (
+                          {pieData.map((_: any, i: number) => (
                             <Cell key={i} fill={COLORS[i % COLORS.length]} />
                           ))}
                         </Pie>
