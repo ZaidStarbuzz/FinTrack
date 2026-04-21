@@ -1,9 +1,20 @@
 import { z } from 'zod'
 
+const emptyToNull = (val: any) => val === '' ? null : val
+
 export const transactionSchema = z.object({
   account_id: z.string().uuid('Select an account'),
-  transfer_account_id: z.string().uuid().optional().nullable(),
-  category_id: z.string().uuid().optional().nullable(),
+
+  transfer_account_id: z.preprocess(
+    emptyToNull,
+    z.string().uuid().nullable().optional()
+  ),
+
+  category_id: z.preprocess(
+    emptyToNull,
+    z.string().uuid().nullable().optional()
+  ),
+
   type: z.enum(['income', 'expense', 'transfer']),
   amount: z.number().positive('Amount must be positive'),
   date: z.string(),
@@ -13,10 +24,50 @@ export const transactionSchema = z.object({
   merchant: z.string().optional().nullable(),
   reference_number: z.string().optional().nullable(),
 })
+  .superRefine((data, ctx) => {
+    if (data.type === 'transfer') {
+      if (!data.transfer_account_id) {
+        ctx.addIssue({
+          path: ['transfer_account_id'],
+          code: z.ZodIssueCode.custom,
+          message: 'Transfer account is required',
+        })
+      }
+
+      if (data.account_id === data.transfer_account_id) {
+        ctx.addIssue({
+          path: ['transfer_account_id'],
+          code: z.ZodIssueCode.custom,
+          message: 'Cannot transfer to same account',
+        })
+      }
+    }
+
+    if (data.type !== 'transfer' && !data.category_id) {
+      ctx.addIssue({
+        path: ['category_id'],
+        code: z.ZodIssueCode.custom,
+        message: 'Category is required',
+      })
+    }
+  })
+// export const transactionSchema = z.object({
+//   account_id: z.string().uuid('Select an account'),
+//   transfer_account_id: z.string().uuid().optional().nullable(),
+//   category_id: z.string().uuid().optional().nullable(),
+//   type: z.enum(['income', 'expense', 'transfer']),
+//   amount: z.number().positive('Amount must be positive'),
+//   date: z.string(),
+//   description: z.string().min(1, 'Description is required').max(255),
+//   notes: z.string().optional().nullable(),
+//   tags: z.array(z.string()).default([]),
+//   merchant: z.string().optional().nullable(),
+//   reference_number: z.string().optional().nullable(),
+// })
 
 export const accountSchema = z.object({
   name: z.string().min(1).max(100),
-  type: z.enum(['bank','cash','credit_card','wallet','investment','loan','fixed_deposit']),
+  type: z.enum(['bank', 'cash', 'credit_card', 'wallet', 'investment', 'loan', 'fixed_deposit']),
   balance: z.number().default(0),
   currency: z.string().default('INR'),
   color: z.string().optional(),
@@ -32,7 +83,7 @@ export const budgetSchema = z.object({
   name: z.string().min(1).max(100),
   category_id: z.string().uuid().optional().nullable(),
   amount: z.number().positive(),
-  period: z.enum(['weekly','monthly','quarterly','yearly','custom']),
+  period: z.enum(['weekly', 'monthly', 'quarterly', 'yearly', 'custom']),
   start_date: z.string(),
   end_date: z.string().optional().nullable(),
   rollover: z.boolean().default(false),
@@ -67,7 +118,7 @@ export const chitFundSchema = z.object({
 
 export const loanSchema = z.object({
   name: z.string().min(1).max(100),
-  type: z.enum(['personal','home','auto','education','business','credit_card','other']),
+  type: z.enum(['personal', 'home', 'auto', 'education', 'business', 'credit_card', 'other']),
   lender_name: z.string().optional().nullable(),
   principal_amount: z.number().positive(),
   interest_rate: z.number().positive(),

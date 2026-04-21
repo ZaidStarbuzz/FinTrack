@@ -63,11 +63,10 @@ export function TransactionForm({ transaction, onSuccess }: Props) {
             key={t}
             type="button"
             onClick={() => form.setValue('type', t)}
-            className={`flex-1 py-2 text-sm font-medium capitalize transition-colors ${
-              type === t
-                ? t === 'expense' ? 'bg-red-500 text-white' : t === 'income' ? 'bg-green-500 text-white' : 'bg-blue-500 text-white'
-                : 'hover:bg-muted'
-            }`}
+            className={`flex-1 py-2 text-sm font-medium capitalize transition-colors ${type === t
+              ? t === 'expense' ? 'bg-red-500 text-white' : t === 'income' ? 'bg-green-500 text-white' : 'bg-blue-500 text-white'
+              : 'hover:bg-muted'
+              }`}
           >
             {t}
           </button>
