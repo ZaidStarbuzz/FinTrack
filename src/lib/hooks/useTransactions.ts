@@ -146,40 +146,6 @@ async function fetchTransactions(filters: TransactionFilters, page = 0) {
   };
 }
 
-async function fetchTransactionsa(filters: TransactionFilters, page = 0) {
-  console.log(filters, "lkjhgfdghjk");
-  let query = supabase
-    .from("transactions")
-    .select(
-      "*, account:accounts(*), category:categories(*), transfer_account:accounts!transfer_account_id(*)",
-      { count: "exact" },
-    )
-    .order("date", { ascending: false })
-    .range(page * PAGE_SIZE, (page + 1) * PAGE_SIZE - 1);
-
-  const { from, to } = buildDateRange(filters);
-  if (from && to) {
-    query = query.gte("date", from).lte("date", to);
-  }
-  if (filters.types?.length) query = query.in("type", filters.types);
-  if (filters.categoryIds?.length)
-    query = query.in("category_id", filters.categoryIds);
-  if (filters.accountIds?.length)
-    query = query.in("account_id", filters.accountIds);
-  if (filters.amountMin !== undefined)
-    query = query.gte("amount", filters.amountMin);
-  if (filters.amountMax !== undefined)
-    query = query.lte("amount", filters.amountMax);
-  if (filters.status?.length) query = query.in("status", filters.status);
-  if (filters.search)
-    query = query.textSearch("description", filters.search, {
-      type: "websearch",
-    });
-  if (filters.tags?.length) query = query.overlaps("tags", filters.tags);
-  const { data, error, count } = await query;
-  if (error) throw error;
-  return { data: data as Transaction[], count: count || 0 };
-}
 
 export function useTransactions(filters: TransactionFilters) {
   return useInfiniteQuery({

@@ -38,7 +38,6 @@ export function TransactionList({ filters }: Props) {
 
   const allTransactions = data?.pages.flatMap((p) => p.data) || [];
   const totalCount = data?.pages[0]?.count || 0;
-  console.log(allTransactions);
   if (isLoading)
     return (
       <div className="flex items-center justify-center py-16">
