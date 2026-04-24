@@ -29,9 +29,10 @@ export async function GET(req: Request) {
 
   const { data: user, error } = await supabase
     .from("users")
-    .select("id,email,full_name")
+    .select("id,email,full_name,password")
     .eq("id", payload.sub)
     .maybeSingle();
   if (error || !user) return NextResponse.json({ user: null }, { status: 200 });
-  return NextResponse.json(user);
+  const { password, ...rest } = user;
+  return NextResponse.json({ ...rest, has_password: !!password });
 }
