@@ -3,6 +3,25 @@ export const runtime = "nodejs";
 import { createClient } from "@supabase/supabase-js";
 import { signToken } from "@/lib/server/auth";
 
+export async function GET(req: Request) {
+  const clientId = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID!;
+  const origin = new URL(req.url).origin;
+  const redirectUri = `${origin}/api/auth/google/callback`;
+
+  const params = new URLSearchParams({
+    client_id: clientId,
+    redirect_uri: redirectUri,
+    response_type: "code",
+    scope: "openid email profile",
+    access_type: "offline",
+    prompt: "select_account",
+  });
+
+  return NextResponse.redirect(
+    `https://accounts.google.com/o/oauth2/v2/auth?${params.toString()}`,
+  );
+}
+
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL || "",
   process.env.SUPABASE_SERVICE_ROLE_KEY || "",

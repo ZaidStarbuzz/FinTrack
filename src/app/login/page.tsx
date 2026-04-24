@@ -1,6 +1,6 @@
 "use client";
 import { useState, useEffect } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import {
   CircleDollarSign,
@@ -18,46 +18,17 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const router = useRouter();
-  useEffect(() => {
-    // Load Google Identity Services
-    if (typeof window !== "undefined" && !(window as any).google) {
-      const s = document.createElement("script");
-      s.src = "https://accounts.google.com/gsi/client";
-      s.async = true;
-      s.defer = true;
-      document.body.appendChild(s);
-      s.onload = () => {
-        try {
-          (window as any).google?.accounts.id.initialize({
-            client_id: process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID,
-            callback: (res: any) => handleGoogleCallback(res),
-          });
-        } catch (e) {}
-      };
-    }
-  }, []);
+  const searchParams = useSearchParams();
 
-  async function handleGoogleCallback(res: any) {
-    try {
-      setLoading(true);
-      setError("");
-      const r = await fetch("/api/auth/google", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ credential: res.credential }),
-      });
-      setLoading(false);
-      if (!r.ok) {
-        const j = await r.json().catch(() => ({}));
-        setError(j.error || "Google sign-in failed");
-      } else {
-        router.push("/dashboard");
-      }
-    } catch (e: any) {
-      setLoading(false);
-      setError(e?.message || "Google sign-in failed");
-    }
-  }
+  useEffect(() => {
+    const err = searchParams.get("error");
+    if (err === "google_cancelled") setError("Google sign-in was cancelled.");
+    else if (err === "google_failed") setError("Google sign-in failed. Please try again.");
+  }, [searchParams]);
+
+  const handleGoogle = () => {
+    window.location.href = "/api/auth/google";
+  };
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -76,14 +47,6 @@ export default function LoginPage() {
     } catch (e: any) {
       setLoading(false);
       setError(e?.message || "Login failed");
-    }
-  };
-
-  const handleGoogle = () => {
-    try {
-      (window as any).google?.accounts.id.prompt();
-    } catch (e) {
-      setError("Google sign-in not available");
     }
   };
 
