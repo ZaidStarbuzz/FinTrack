@@ -1,5 +1,5 @@
 "use client";
-import { useState, useEffect } from "react";
+import { useState, useEffect, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import {
@@ -11,7 +11,7 @@ import {
   Loader2,
 } from "lucide-react";
 
-export default function LoginPage() {
+function LoginForm() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPwd, setShowPwd] = useState(false);
@@ -53,7 +53,6 @@ export default function LoginPage() {
   return (
     <div className="min-h-screen flex items-center justify-center bg-background p-4">
       <div className="w-full max-w-md">
-        {/* Logo */}
         <div className="flex flex-col items-center mb-8">
           <div className="w-14 h-14 rounded-2xl bg-primary flex items-center justify-center mb-4 shadow-lg shadow-primary/30">
             <CircleDollarSign className="w-8 h-8 text-white" />
@@ -65,7 +64,6 @@ export default function LoginPage() {
         </div>
 
         <div className="bg-card border rounded-2xl p-8 shadow-xl">
-          {/* Google OAuth */}
           <button
             onClick={handleGoogle}
             className="w-full flex items-center justify-center gap-3 py-3 rounded-xl border hover:bg-muted transition-colors font-medium text-sm mb-6"
@@ -170,5 +168,13 @@ export default function LoginPage() {
         </div>
       </div>
     </div>
+  );
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense>
+      <LoginForm />
+    </Suspense>
   );
 }
