@@ -80,6 +80,45 @@ function guessCategoryName(merchant: string | null, text: string): string | null
   return null;
 }
 
+// ─── Health check ────────────────────────────────────────────────────────────
+
+export async function GET(req: NextRequest) {
+  const { searchParams } = new URL(req.url);
+  const token = searchParams.get("token");
+
+  if (!token) {
+    return NextResponse.json({ ok: true, status: "webhook is live. provide ?token= to verify auth." });
+  }
+
+  const { data: user } = await supabase
+    .from("users")
+    .select("id, email")
+    .eq("sms_token", token)
+    .maybeSingle();
+
+  if (!user) {
+    return NextResponse.json({ ok: false, error: "Invalid token" }, { status: 401 });
+  }
+
+  // Return last 5 SMS-imported transactions for this user
+  const { data: recent } = await supabase
+    .from("transactions")
+    .select("id, amount, type, merchant, description, date, created_at")
+    .eq("user_id", user.id)
+    .contains("tags", ["sms-auto"])
+    .order("created_at", { ascending: false })
+    .limit(5);
+
+  return NextResponse.json({
+    ok: true,
+    authenticated_as: user.email,
+    recent_sms_transactions: recent ?? [],
+    message: recent?.length
+      ? `Webhook is working. ${recent.length} SMS transaction(s) received.`
+      : "Webhook is live and authenticated, but no SMS transactions yet.",
+  });
+}
+
 // ─── Handler ─────────────────────────────────────────────────────────────────
 
 export async function POST(req: NextRequest) {

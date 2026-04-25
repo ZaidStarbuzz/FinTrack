@@ -39,6 +39,8 @@ export default function SettingsPage() {
   const [smsToken, setSmsToken] = useState<string | null>(null);
   const [smsTokenLoading, setSmsTokenLoading] = useState(false);
   const [smsTokenCopied, setSmsTokenCopied] = useState(false);
+  const [smsLogs, setSmsLogs] = useState<any[]>([]);
+  const [smsLogsLoading, setSmsLogsLoading] = useState(false);
   const { theme, setTheme } = useTheme();
   const router = useRouter();
   const supabase = createClient();
@@ -61,6 +63,7 @@ export default function SettingsPage() {
       if (tokenRes.ok) {
         const j = await tokenRes.json();
         setSmsToken(j.token);
+        if (j.token) fetchSmsLogs(j.token);
       }
     })();
   }, []);
@@ -75,6 +78,19 @@ export default function SettingsPage() {
       toast.success("New webhook token generated");
     } else {
       toast.error(j.error || "Failed to generate token");
+    }
+  };
+
+  const fetchSmsLogs = async (token: string) => {
+    setSmsLogsLoading(true);
+    try {
+      const res = await fetch(`/api/sms-webhook?token=${token}`);
+      const j = await res.json();
+      setSmsLogs(j.recent_sms_transactions ?? []);
+    } catch {
+      toast.error("Failed to fetch logs");
+    } finally {
+      setSmsLogsLoading(false);
     }
   };
 
@@ -456,6 +472,53 @@ export default function SettingsPage() {
                 <p className="text-xs text-muted-foreground border-t pt-3">
                   Transactions are deduplicated automatically — the same SMS will never be inserted twice. Make sure each bank account has its <strong>last 4 digits</strong> filled in under Accounts.
                 </p>
+              </div>
+            )}
+
+            {/* Live log */}
+            {smsToken && (
+              <div>
+                <div className="flex items-center justify-between mb-2">
+                  <p className="text-sm font-medium">Recent SMS transactions</p>
+                  <button
+                    onClick={() => fetchSmsLogs(smsToken)}
+                    disabled={smsLogsLoading}
+                    className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors"
+                  >
+                    <RefreshCw className={`w-3 h-3 ${smsLogsLoading ? "animate-spin" : ""}`} />
+                    Refresh
+                  </button>
+                </div>
+                {smsLogsLoading ? (
+                  <div className="flex items-center gap-2 py-4 text-sm text-muted-foreground">
+                    <Loader2 className="w-4 h-4 animate-spin" /> Checking...
+                  </div>
+                ) : smsLogs.length === 0 ? (
+                  <div className="rounded-lg border border-dashed p-4 text-center text-sm text-muted-foreground">
+                    No SMS transactions yet. Send a bank SMS and it will appear here.
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    {smsLogs.map((t: any) => (
+                      <div key={t.id} className="flex items-center justify-between rounded-lg border bg-muted/30 px-3 py-2.5 text-sm">
+                        <div className="flex items-center gap-2 min-w-0">
+                          <span className={`shrink-0 w-2 h-2 rounded-full ${t.type === "expense" ? "bg-red-500" : "bg-green-500"}`} />
+                          <span className="truncate text-muted-foreground text-xs">
+                            {t.merchant || t.description?.slice(0, 40) || "Unknown"}
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-3 shrink-0 ml-2">
+                          <span className={`font-semibold text-xs ${t.type === "expense" ? "text-red-500" : "text-green-500"}`}>
+                            {t.type === "expense" ? "-" : "+"}₹{Number(t.amount).toLocaleString("en-IN")}
+                          </span>
+                          <span className="text-xs text-muted-foreground">
+                            {new Date(t.created_at).toLocaleString("en-IN", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })}
+                          </span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
             )}
           </div>
