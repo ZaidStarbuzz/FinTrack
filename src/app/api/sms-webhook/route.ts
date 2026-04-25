@@ -26,38 +26,73 @@ function parseSMS(text: string): ParsedSMS {
   const amountMatch = text.match(/(?:Rs\.?|INR|₹)\s*([0-9,]+(?:\.[0-9]{1,2})?)/i);
   const amount = amountMatch ? parseFloat(amountMatch[1].replace(/,/g, "")) : null;
 
-  // Account last 4 digits — XX1234 / x1234 / *1234 / A/c 1234 / ac no 1234
-  const acctMatch =
-    text.match(/(?:a\/c|ac|account|card|A\/C)\s*(?:no\.?|ending|XX+|x+|\*+)?\.?\s*([0-9]{4})\b/i) ||
-    text.match(/\b(?:XX|xx|x{2,}|\*{2,})([0-9]{4})\b/) ||
-    text.match(/\b([0-9]{4})\b(?=\s*(?:is|has|was|debited|credited))/i);
-  const accountLast4 = acctMatch ? acctMatch[1] : null;
+  // Account last 4 digits
+  // Handles: XX324 (ICICI 3-digit), XX8212 (IndusInd 4-digit), *XX8212, A/C *XX8212
+  // Also handles Acct XX324 where last 3 digits are used (pad to match stored last4)
+  let accountLast4: string | null = null;
+  const acctPatterns = [
+    // A/C *XX8212 or A/C XX8212
+    /(?:a\/c|ac|acct|account|card)\s*\*?(?:XX+|xx+|x{1,}|\*{1,})\s*([0-9]{3,4})\b/i,
+    // standalone XX324 or XX8212 or *XX8212
+    /\*?(?:XX|xx)([0-9]{3,4})\b/,
+    // 4-digit preceded by debited/credited keyword
+    /\b([0-9]{4})\b(?=\s*(?:is\s+)?(?:debited|credited))/i,
+  ];
+  for (const pattern of acctPatterns) {
+    const m = text.match(pattern);
+    if (m) {
+      // Pad 3-digit to 4-digit with leading 0 to match stored last4 "0324"
+      accountLast4 = m[1].length === 3 ? "0" + m[1] : m[1];
+      break;
+    }
+  }
 
-  // Reference / UPI / UTR number
+  // Reference number — UPI / RRN / UTR / IMPS / NEFT / Ref
   const refMatch = text.match(
-    /(?:ref(?:erence)?(?:\s*no\.?|num)?|txn\s*(?:id|no)?|utr|imps|neft|upi\s*ref)[:\s#]*([A-Z0-9]{6,25})/i,
+    /(?:rrn|ref(?:erence)?(?:\s*no\.?|num)?|txn\s*(?:id|no)?|utr|imps|neft|upi)[:\s#]*([0-9]{6,25})/i,
   );
   const refNumber = refMatch ? refMatch[1] : null;
 
   // Available balance
   const balMatch = text.match(
-    /(?:avl\.?\s*bal(?:ance)?|available\s*bal(?:ance)?|bal\.?)[:\s]*(?:Rs\.?|INR|₹)?\s*([0-9,]+(?:\.[0-9]{1,2})?)/i,
+    /(?:avl\.?\s*bal(?:ance)?|available\s*bal(?:ance)?|bal)[:\s]*(?:Rs\.?|INR|₹)?\s*([0-9,]+(?:\.[0-9]{1,2})?)/i,
   );
   const balance = balMatch ? parseFloat(balMatch[1].replace(/,/g, "")) : null;
 
   // Transaction type
   const lc = text.toLowerCase();
   let type: ParsedSMS["type"] = null;
-  if (/debited|debit|withdrawn|payment\s+of|paid\s+to|spent|purchase|pos\s|emi\s|transferred\s+to|sent\s+to/i.test(lc))
+  if (/debited|debit\s+by|withdrawn|payment\s+of|paid\s+to|spent|purchase|pos\s|emi\s|transferred\s+to|sent\s+to/i.test(lc))
     type = "expense";
-  else if (/credited|credit|received|deposited|refund|cashback|salary|transferred\s+from|received\s+from/i.test(lc))
+  else if (/credited|credit\s+by|received|deposited|refund|cashback|salary|transferred\s+from|received\s+from/i.test(lc))
     type = "income";
 
-  // Merchant — appears after "at", "to", "from", "towards"
-  const merchantMatch = text.match(
-    /(?:at|to|from|towards)\s+([A-Za-z0-9&'.\-\s]{2,40}?)(?:\s+on\s|\s+for\s|\s+via\s|\s+ref|\s+UPI|\s+using|\s+through|\.|,|$)/i,
-  );
-  const merchant = merchantMatch ? merchantMatch[1].trim() : null;
+  // Merchant extraction — prioritise "from NAME" for credits, "towards NAME" / "; NAME credited" for debits
+  let merchant: string | null = null;
+
+  // ICICI debit pattern: "; NAME credited." — e.g. "RAJ KUMBAJI credited"
+  const iciciDebitMerchant = text.match(/;\s*([A-Z][A-Za-z\s]{2,40}?)\s+credited/);
+  if (iciciDebitMerchant) {
+    merchant = iciciDebitMerchant[1].trim();
+  }
+
+  // ICICI credit pattern: "from NAME. UPI" — e.g. "from RAJ KUMBAJI."
+  if (!merchant) {
+    const iciciCreditMerchant = text.match(/from\s+([A-Z][A-Za-z\s]{2,40}?)(?:\.\s*UPI|\s+UPI|\.)/);
+    if (iciciCreditMerchant) merchant = iciciCreditMerchant[1].trim();
+  }
+
+  // IndusInd / generic: "towards NAME" or "to NAME"
+  if (!merchant) {
+    const towardsMerchant = text.match(/(?:towards|to)\s+([A-Za-z0-9@._\-]{3,50}?)(?:\s*\.|,|\s+RRN|\s+Ref|\s+on\s|$)/i);
+    if (towardsMerchant) merchant = towardsMerchant[1].trim();
+  }
+
+  // Generic fallback: "at NAME" / "from NAME"
+  if (!merchant) {
+    const genericMerchant = text.match(/(?:at|from)\s+([A-Za-z0-9&'.\-\s]{2,40}?)(?:\s+on\s|\s+for\s|\s+via\s|\s+ref|\s+UPI|\.)/i);
+    if (genericMerchant) merchant = genericMerchant[1].trim();
+  }
 
   return { type, amount, merchant, accountLast4, balance, refNumber };
 }
