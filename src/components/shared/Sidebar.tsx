@@ -7,11 +7,12 @@ import {
   LayoutDashboard, ArrowLeftRight, CreditCard, PieChart,
   Target, Wallet, TrendingUp, Settings, ChevronLeft,
   ChevronRight, Bell, FileText, Users, BadgeDollarSign,
-  CircleDollarSign, Coins, BarChart3
+  CircleDollarSign, Coins, BarChart3, Sparkles
 } from 'lucide-react'
 
 const navItems = [
   { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
+  { href: '/ai', label: 'AI Advisor', icon: Sparkles, highlight: true },
   { href: '/transactions', label: 'Transactions', icon: ArrowLeftRight },
   { href: '/accounts', label: 'Accounts', icon: CreditCard },
   { href: '/budgets', label: 'Budgets', icon: Wallet },
@@ -63,6 +64,7 @@ export function Sidebar() {
       <nav className="flex-1 overflow-y-auto py-4 px-2 space-y-1">
         {navItems.map(item => {
           const active = pathname === item.href || (item.href !== '/dashboard' && pathname.startsWith(item.href))
+          const isHighlight = (item as any).highlight
           return (
             <Link
               key={item.href}
@@ -70,12 +72,15 @@ export function Sidebar() {
               title={sidebarCollapsed ? item.label : undefined}
               className={cn(
                 'nav-item',
-                active ? 'nav-item-active' : 'nav-item-inactive',
+                active ? 'nav-item-active' : isHighlight ? 'nav-item-inactive border border-primary/30 bg-primary/5 text-primary hover:bg-primary/10' : 'nav-item-inactive',
                 sidebarCollapsed && 'justify-center px-0'
               )}
             >
-              <item.icon className="w-5 h-5 flex-shrink-0" />
-              {!sidebarCollapsed && <span>{item.label}</span>}
+              <item.icon className={cn("w-5 h-5 flex-shrink-0", isHighlight && !active && "text-primary")} />
+              {!sidebarCollapsed && <span className={cn(isHighlight && !active && "text-primary font-medium")}>{item.label}</span>}
+              {!sidebarCollapsed && isHighlight && !active && (
+                <span className="ml-auto text-[10px] font-bold bg-primary text-white px-1.5 py-0.5 rounded-full">AI</span>
+              )}
               {!sidebarCollapsed && active && (
                 <span className="ml-auto w-1.5 h-1.5 rounded-full bg-primary" />
               )}
